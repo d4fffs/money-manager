@@ -19,16 +19,15 @@ export default function Home() {
   const [activePeriod, setActivePeriod] = useState<any>(null)
   const [weeklySpent, setWeeklySpent] = useState(0)
 
-  // Modal states
   const [showTambahModal, setShowTambahModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showWeeklyModal, setShowWeeklyModal] = useState(false)
 
-  // Form inputs
   const [newSaldo, setNewSaldo] = useState('')
   const [periodName, setPeriodName] = useState('')
   const [weeklyLimit, setWeeklyLimit] = useState('')
 
+  // Cek user login
   useEffect(() => {
     async function checkUser() {
       const { data } = await supabase.auth.getUser()
@@ -43,6 +42,7 @@ export default function Home() {
     checkUser()
   }, [router])
 
+  // Ambil data allowance, expenses, dan periode aktif
   async function fetchData() {
     const { data: a, error: allowanceError } = await supabase
       .from('allowances')
@@ -72,7 +72,7 @@ export default function Home() {
       setRemaining(Number(a.remaining_amount ?? Number(a.total_amount) - totalSpent))
     }
 
-    // Ambil periode mingguan aktif
+    // Cek periode mingguan aktif
     const today = new Date().toISOString().split('T')[0]
     const { data: wp, error: wpError } = await supabase
       .from('weekly_periods')
@@ -86,7 +86,7 @@ export default function Home() {
     if (wpError && wpError.code !== 'PGRST116') console.error(wpError)
     setActivePeriod(wp || null)
 
-    // Hitung pengeluaran dalam periode aktif
+    // Hitung pengeluaran minggu ini
     if (wp) {
       const { data: wexp, error: wexpErr } = await supabase
         .from('expenses')
@@ -187,8 +187,13 @@ export default function Home() {
     }
   }
 
-  // Simpan limit mingguan
+  // Tambah periode mingguan (dengan validasi periode aktif)
   async function simpanLimitMingguan() {
+    if (activePeriod) {
+      toast.error('Masih ada periode mingguan aktif! Selesaikan dulu sebelum membuat baru.')
+      return
+    }
+
     if (!periodName.trim()) {
       toast.error('Masukkan nama periode')
       return
@@ -314,8 +319,19 @@ export default function Home() {
           </button>
 
           <button
-            onClick={() => setShowWeeklyModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold shadow-md transition-all"
+            onClick={() => {
+              if (activePeriod) {
+                toast.error('Masih ada periode aktif! Tunggu sampai selesai sebelum menambah yang baru.')
+              } else {
+                setShowWeeklyModal(true)
+              }
+            }}
+            disabled={!!activePeriod}
+            className={`px-6 py-3 rounded-xl font-semibold shadow-md transition-all ${
+              activePeriod
+                ? 'bg-gray-400 text-white cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 text-white'
+            }`}
           >
             📅 Tambah Periode Mingguan
           </button>
@@ -330,7 +346,6 @@ export default function Home() {
 
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
             <h2 className="text-xl font-bold text-gray-800 mb-4">Ringkasan</h2>
-
             <div className="space-y-4">
               <div className="bg-gradient-to-r from-red-50 to-pink-50 rounded-xl p-5 border border-red-100">
                 <p className="text-sm text-gray-600 mb-1">Total Pengeluaran</p>
@@ -379,6 +394,7 @@ export default function Home() {
       </div>
 
       {/* === MODALS === */}
+      {/* Tambah Saldo */}
       {showTambahModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white rounded-xl p-6 w-96 shadow-lg">
@@ -409,6 +425,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* Edit Saldo */}
       {showEditModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white rounded-xl p-6 w-96 shadow-lg">
@@ -439,15 +456,11 @@ export default function Home() {
         </div>
       )}
 
+      {/* Tambah Periode Mingguan */}
       {showWeeklyModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <span className="text-2xl">📅</span>
-              </div>
-                            <h2 className="text-2xl font-bold text-gray-800">Buat Periode Mingguan</h2>
-            </div>
+                   <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-lg">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Buat Periode Mingguan Baru</h2>
 
             <div className="space-y-4">
               <div>
@@ -462,7 +475,7 @@ export default function Home() {
               </div>
 
               <div>
-                <label className="text-sm text-gray-600">Limit Mingguan</label>
+                <label className="text-sm text-gray-600">Limit Mingguan (Rp)</label>
                 <input
                   type="number"
                   value={weeklyLimit}
