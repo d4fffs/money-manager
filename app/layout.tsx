@@ -31,9 +31,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     <h1 className="text-xl md:text-2xl font-bold text-gray-800">
                       Money Manager
                     </h1>
-                    <p className="text-sm text-gray-500 mt-1 hidden md:block">
-                      Kelola uang jajan 25-25 dengan limit mingguan
-                    </p>
                   </div>
                 </div>
 
