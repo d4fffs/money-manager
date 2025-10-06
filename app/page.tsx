@@ -8,25 +8,6 @@ import AddExpenseForm from '@/components/AddExpenseForm'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 
-// 🔒 Komponen Logout
-function LogoutButton() {
-  const router = useRouter()
-
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    router.push('/login')
-  }
-
-  return (
-    <button
-      onClick={handleLogout}
-      className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition fixed top-4 right-4 shadow-md"
-    >
-      Logout
-    </button>
-  )
-}
-
 // 🔒 Proteksi halaman (cek login)
 export default function Home() {
   const router = useRouter()
@@ -189,7 +170,6 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6 md:p-8 relative">
       {/* Tombol logout di kanan atas */}
-      <LogoutButton />
 
       <div className="max-w-6xl mx-auto opacity-80">
         <AllowanceCard allowance={allowance} remaining={remaining} />
