@@ -2,12 +2,16 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/db'
 import Link from 'next/link'
+import toast from 'react-hot-toast'
 
 export default function History() {
   const [weeklyHistory, setWeeklyHistory] = useState<any[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState<any | null>(null)
   const [dailyExpenses, setDailyExpenses] = useState<any[]>([])
   const [loadingDetails, setLoadingDetails] = useState(false)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [periodToDelete, setPeriodToDelete] = useState<any | null>(null)
 
   useEffect(() => {
     loadWeeklyHistory()
@@ -80,6 +84,45 @@ export default function History() {
     setLoadingDetails(false)
   }
 
+  function confirmDelete(wp: any, e: React.MouseEvent) {
+    e.stopPropagation()
+    setPeriodToDelete(wp)
+    setShowDeleteConfirm(true)
+  }
+
+  async function handleDelete() {
+    if (!periodToDelete) return
+
+    setDeletingId(periodToDelete.id)
+    try {
+      // Hapus semua expenses yang terkait dengan periode ini
+      const { error: expensesError } = await supabase
+        .from('expenses')
+        .delete()
+        .eq('weekly_period_id', periodToDelete.id)
+
+      if (expensesError) throw expensesError
+
+      // Hapus periode mingguan
+      const { error: periodError } = await supabase
+        .from('weekly_periods')
+        .delete()
+        .eq('id', periodToDelete.id)
+
+      if (periodError) throw periodError
+
+      toast.success('Limit mingguan berhasil dihapus!')
+      setShowDeleteConfirm(false)
+      setPeriodToDelete(null)
+      loadWeeklyHistory()
+    } catch (err: any) {
+      console.error(err)
+      toast.error('Gagal menghapus limit mingguan!')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6 md:p-8">
       <div className="max-w-4xl mx-auto">
@@ -107,8 +150,30 @@ export default function History() {
                 onClick={() => showPeriodDetails(wp)}
                 className={`cursor-pointer bg-white rounded-2xl p-6 shadow-lg border ${
                   wp.isActive ? 'border-indigo-200 ring-2 ring-indigo-100' : 'border-gray-100'
-                } hover:shadow-xl transition-all`}
+                } hover:shadow-xl transition-all relative`}
               >
+                {/* Tombol Hapus */}
+                <button
+                  onClick={(e) => confirmDelete(wp, e)}
+                  disabled={deletingId === wp.id}
+                  className="absolute top-4 right-4 p-2 bg-red-50 hover:bg-red-100 rounded-lg transition-all group disabled:opacity-50"
+                  title="Hapus periode ini"
+                >
+                  <svg
+                    className="w-5 h-5 text-red-600 group-hover:scale-110 transition-transform"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
+                </button>
+
                 {wp.isActive && (
                   <div className="mb-3">
                     <span className="inline-block px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-semibold">
@@ -116,7 +181,7 @@ export default function History() {
                     </span>
                   </div>
                 )}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pr-12">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="font-semibold text-gray-800">
@@ -158,6 +223,65 @@ export default function History() {
         {weeklyHistory.length === 0 && (
           <div className="bg-white rounded-2xl p-12 text-center shadow-lg border border-gray-100">
             <p className="text-gray-500 text-lg">Belum ada riwayat periode mingguan</p>
+          </div>
+        )}
+
+        {/* Modal Konfirmasi Hapus */}
+        {showDeleteConfirm && periodToDelete && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl shadow-2xl w-[90%] max-w-md p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                  <svg
+                    className="w-6 h-6 text-red-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-gray-800">Konfirmasi Hapus</h3>
+              </div>
+
+              <p className="text-gray-600 mb-2">
+                Apakah Anda yakin ingin menghapus periode mingguan ini?
+              </p>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-yellow-800 font-medium">
+                  ⚠️ Periode: {new Date(periodToDelete.start_date).toLocaleDateString('id-ID')} —{' '}
+                  {new Date(periodToDelete.end_date).toLocaleDateString('id-ID')}
+                </p>
+                <p className="text-sm text-yellow-700 mt-1">
+                  Semua pengeluaran terkait periode ini juga akan dihapus!
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteConfirm(false)
+                    setPeriodToDelete(null)
+                  }}
+                  className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 transition font-medium"
+                  disabled={deletingId !== null}
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={deletingId !== null}
+                  className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition font-medium disabled:opacity-50"
+                >
+                  {deletingId !== null ? 'Menghapus...' : 'Ya, Hapus'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
