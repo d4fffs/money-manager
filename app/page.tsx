@@ -164,15 +164,14 @@ export default function Home() {
     setLoading(true)
     try {
       const today = new Date()
-      const startOfWeek = new Date(today)
-      startOfWeek.setDate(today.getDate() - today.getDay()) // Minggu dimulai hari Minggu
+      const startDate = new Date(today) // Mulai dari hari ini
       
-      const endOfWeek = new Date(startOfWeek)
-      endOfWeek.setDate(startOfWeek.getDate() + 6)
+      const endDate = new Date(startDate)
+      endDate.setDate(startDate.getDate() + 6) // 7 hari dari hari ini
 
       const { error } = await supabase.from('weekly_periods').insert([{
-        start_date: startOfWeek.toISOString().split('T')[0],
-        end_date: endOfWeek.toISOString().split('T')[0],
+        start_date: startDate.toISOString().split('T')[0],
+        end_date: endDate.toISOString().split('T')[0],
         weekly_limit: Number(weeklyLimit)
       }])
 
