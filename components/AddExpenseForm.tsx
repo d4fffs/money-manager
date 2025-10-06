@@ -16,8 +16,6 @@ export default function AddExpenseForm({ onAdded }: any) {
     setLoading(true)
     try {
       const today = new Date().toISOString().split('T')[0]
-
-      // Ambil periode mingguan aktif
       const { data: weeklyPeriods, error: wpError } = await supabase
         .from('weekly_periods')
         .select('*')

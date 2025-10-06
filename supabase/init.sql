@@ -1,4 +1,3 @@
--- Create tables for allowances, weekly_limits, expenses
 create table if not exists allowances (
   id uuid primary key default gen_random_uuid(),
   period_start date not null,
