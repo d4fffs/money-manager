@@ -1,11 +1,12 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/db'
 import toast, { Toaster } from 'react-hot-toast'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
@@ -14,29 +15,45 @@ export default function LoginPage() {
       setUser(data.user)
     })
 
-    // Listener jika status login berubah
+    // Listener perubahan status login
     const { data: listener } = supabase.auth.onAuthStateChange(async (_, session) => {
       const currentUser = session?.user
       setUser(currentUser ?? null)
 
-      if (currentUser) {
-        const exists = await checkProfileExists(currentUser)
+      if (!currentUser) return
 
-        if (exists) {
-          toast.success('Berhasil login 🎉')
-          router.push('/')
-        } else {
-          toast.error('Akun belum terdaftar! Silakan daftar terlebih dahulu.')
-          await supabase.auth.signOut()
-          setUser(null)
-        }
+      const isSignup = searchParams.get('mode') === 'signup'
+      const exists = await checkProfileExists(currentUser)
+
+      // Jika sedang daftar dan profil belum ada, buat profil baru
+      if (isSignup && !exists) {
+        await createProfile(currentUser)
+        toast.success('Akun berhasil dibuat 🎉')
+        await supabase.auth.signOut()
+        setUser(null)
+        router.replace('/login')
+        return
+      }
+
+      // Jika mencoba login tapi belum terdaftar
+      if (!isSignup && !exists) {
+        toast.error('Akun belum terdaftar! Silakan daftar terlebih dahulu.')
+        await supabase.auth.signOut()
+        setUser(null)
+        return
+      }
+
+      // Jika login berhasil dan profil ada
+      if (!isSignup && exists) {
+        toast.success('Berhasil login 🎉')
+        router.push('/')
       }
     })
 
     return () => listener.subscription.unsubscribe()
-  }, [router])
+  }, [router, searchParams])
 
-  // 🔹 Cek apakah profil sudah ada di tabel profiles
+  // 🔹 Cek apakah profil sudah ada
   async function checkProfileExists(user: any) {
     const { data: existingProfile, error } = await supabase
       .from('profiles')
@@ -46,48 +63,54 @@ export default function LoginPage() {
 
     if (error) {
       console.error('Error checking profile:', error.message)
-      toast.error('Gagal memeriksa data akun. Coba lagi nanti.')
+      toast.error('Gagal memeriksa akun.')
       return false
     }
 
     return !!existingProfile
   }
 
+  // 🔹 Buat profil baru untuk user yang baru daftar
+  async function createProfile(user: any) {
+    const { error } = await supabase.from('profiles').insert({
+      id: user.id,
+      full_name: user.user_metadata?.full_name || null,
+      email: user.email,
+    })
+    if (error) console.error('Error creating profile:', error.message)
+  }
+
   // 🔹 Login (selalu tampilkan pilihan akun)
   async function handleGoogleLogin() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { queryParams: { prompt: 'select_account' } },
+      options: {
+        queryParams: { prompt: 'select_account' },
+        redirectTo: `${window.location.origin}/login?mode=login`,
+      },
     })
-    if (error) {
-      console.error('Login Error:', error.message)
-      toast.error(`Login gagal: ${error.message}`)
-    } else {
-      toast.loading('Mengalihkan ke Google...')
-    }
+    if (error) toast.error(`Login gagal: ${error.message}`)
+    else toast.loading('Mengalihkan ke Google...')
   }
 
   // 🔹 Daftar (buat profil baru)
   async function handleGoogleSignup() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { queryParams: { prompt: 'select_account' } },
+      options: {
+        queryParams: { prompt: 'select_account' },
+        redirectTo: `${window.location.origin}/login?mode=signup`,
+      },
     })
-    if (error) {
-      console.error('Signup Error:', error.message)
-      toast.error(`Gagal daftar: ${error.message}`)
-    } else {
-      toast.loading('Mengalihkan ke Google...')
-    }
+    if (error) toast.error(`Gagal daftar: ${error.message}`)
+    else toast.loading('Mengalihkan ke Google...')
   }
 
   // 🔹 Logout
   async function handleLogout() {
     const { error } = await supabase.auth.signOut()
-    if (error) {
-      console.error('Logout Error:', error.message)
-      toast.error(`Gagal logout: ${error.message}`)
-    } else {
+    if (error) toast.error(`Gagal logout: ${error.message}`)
+    else {
       setUser(null)
       toast.success('Berhasil logout 👋')
     }
