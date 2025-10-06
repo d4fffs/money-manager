@@ -24,6 +24,7 @@ export default function Home() {
 
   // Form inputs
   const [newSaldo, setNewSaldo] = useState('')
+  const [periodName, setPeriodName] = useState('')
   const [weeklyLimit, setWeeklyLimit] = useState('')
 
   useEffect(() => {
@@ -156,6 +157,11 @@ export default function Home() {
 
   // Simpan limit mingguan
   async function simpanLimitMingguan() {
+    if (!periodName.trim()) {
+      toast.error('Masukkan nama periode')
+      return
+    }
+
     if (!weeklyLimit || isNaN(Number(weeklyLimit)) || Number(weeklyLimit) <= 0) {
       toast.error('Masukkan limit mingguan yang valid')
       return
@@ -164,24 +170,27 @@ export default function Home() {
     setLoading(true)
     try {
       const today = new Date()
-      const startDate = new Date(today) // Mulai dari hari ini
+      const startDate = new Date(today)
       
       const endDate = new Date(startDate)
-      endDate.setDate(startDate.getDate() + 6) // 7 hari dari hari ini
+      endDate.setDate(startDate.getDate() + 6)
 
       const { error } = await supabase.from('weekly_periods').insert([{
+        period_name: periodName.trim(),
         start_date: startDate.toISOString().split('T')[0],
         end_date: endDate.toISOString().split('T')[0],
-        weekly_limit: Number(weeklyLimit)
+        weekly_limit: Number(weeklyLimit),
+        allowance_id: allowance?.id || null
       }])
 
       if (error) throw error
-      toast.success('Limit mingguan berhasil ditambahkan!')
+      toast.success('Periode mingguan berhasil ditambahkan!')
       setShowWeeklyModal(false)
+      setPeriodName('')
       setWeeklyLimit('')
     } catch (err: any) {
       console.error(err)
-      toast.error('Gagal menambahkan limit mingguan!')
+      toast.error('Gagal menambahkan periode mingguan!')
     } finally {
       setLoading(false)
     }
@@ -219,7 +228,7 @@ export default function Home() {
             onClick={() => setShowWeeklyModal(true)}
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold shadow-md transition-all"
           >
-            🔵 Tambah Limit Mingguan
+            📅 Tambah Periode Mingguan
           </button>
         </div>
 
@@ -341,31 +350,68 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL: Tambah Limit Mingguan */}
+      {/* MODAL: Tambah Periode Mingguan */}
       {showWeeklyModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white rounded-xl p-6 w-96 shadow-lg">
-            <h2 className="text-xl font-semibold mb-4">Tambah Limit Mingguan</h2>
-            <input
-              type="number"
-              value={weeklyLimit}
-              onChange={(e) => setWeeklyLimit(e.target.value)}
-              placeholder="Masukkan limit mingguan"
-              className="border border-gray-300 rounded-lg w-full p-2 mb-4"
-            />
-            <div className="flex justify-end gap-3">
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                <span className="text-2xl">📅</span>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800">Buat Periode Mingguan</h2>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nama Periode
+                </label>
+                <input
+                  type="text"
+                  value={periodName}
+                  onChange={(e) => setPeriodName(e.target.value)}
+                  placeholder="Contoh: Minggu 1 Oktober"
+                  className="border border-gray-300 rounded-lg w-full p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Limit Mingguan (Rp)
+                </label>
+                <input
+                  type="number"
+                  value={weeklyLimit}
+                  onChange={(e) => setWeeklyLimit(e.target.value)}
+                  placeholder="Masukkan nominal limit"
+                  className="border border-gray-300 rounded-lg w-full p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                />
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-800">
+                  <strong>Info:</strong> Periode akan dimulai dari hari ini dan berlaku selama 7 hari ke depan.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
               <button
-                onClick={() => setShowWeeklyModal(false)}
-                className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+                onClick={() => {
+                  setShowWeeklyModal(false)
+                  setPeriodName('')
+                  setWeeklyLimit('')
+                }}
+                className="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition"
               >
                 Batal
               </button>
               <button
                 onClick={simpanLimitMingguan}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={loading}
               >
-                {loading ? 'Memproses...' : 'Simpan'}
+                {loading ? 'Menyimpan...' : '💾 Simpan Periode'}
               </button>
             </div>
           </div>
