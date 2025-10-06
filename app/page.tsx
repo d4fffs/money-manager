@@ -154,6 +154,40 @@ export default function Home() {
     }
   }
 
+  // Simpan limit mingguan
+  async function simpanLimitMingguan() {
+    if (!weeklyLimit || isNaN(Number(weeklyLimit)) || Number(weeklyLimit) <= 0) {
+      toast.error('Masukkan limit mingguan yang valid')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const today = new Date()
+      const startOfWeek = new Date(today)
+      startOfWeek.setDate(today.getDate() - today.getDay()) // Minggu dimulai hari Minggu
+      
+      const endOfWeek = new Date(startOfWeek)
+      endOfWeek.setDate(startOfWeek.getDate() + 6)
+
+      const { error } = await supabase.from('weekly_periods').insert([{
+        start_date: startOfWeek.toISOString().split('T')[0],
+        end_date: endOfWeek.toISOString().split('T')[0],
+        weekly_limit: Number(weeklyLimit)
+      }])
+
+      if (error) throw error
+      toast.success('Limit mingguan berhasil ditambahkan!')
+      setShowWeeklyModal(false)
+      setWeeklyLimit('')
+    } catch (err: any) {
+      console.error(err)
+      toast.error('Gagal menambahkan limit mingguan!')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   if (!user || globalLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-700">
@@ -328,13 +362,11 @@ export default function Home() {
                 Batal
               </button>
               <button
-                onClick={() => {
-                  toast.success('Fitur limit mingguan belum diimplementasi')
-                  setShowWeeklyModal(false)
-                }}
+                onClick={simpanLimitMingguan}
                 className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                disabled={loading}
               >
-                Simpan
+                {loading ? 'Memproses...' : 'Simpan'}
               </button>
             </div>
           </div>
