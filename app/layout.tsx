@@ -6,6 +6,9 @@ import UserMenu from '@/components/UserMenu'
 export const metadata = {
   title: 'Money Manager',
   description: 'Manage allowance 25–25 with weekly limit',
+  icons: {
+    icon: "/favicon.png",
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
