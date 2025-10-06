@@ -14,7 +14,6 @@ Dark-mode money manager app (period 25→24), weekly limit + notification.
 4. Create DB tables: run the SQL in `supabase/init.sql` using Supabase SQL editor.
 
 ## Features
-- Period 25 → next 24 with default amount 1.550.000
 - Weekly limit and notification when exceeded
 - Add expenses and view history per period
 
