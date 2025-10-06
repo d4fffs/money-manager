@@ -8,11 +8,7 @@ export const metadata = {
   description: 'Manage allowance 25–25 with weekly limit',
 }
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="id">
       <body className="bg-gradient-to-br from-slate-50 to-gray-100 min-h-screen">
@@ -35,15 +31,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     <h1 className="text-xl md:text-2xl font-bold text-gray-800">
                       Money Manager
                     </h1>
-                    {user && (
-                      <p className="text-sm text-gray-500 mt-1">
-                        Halo, {user.user_metadata.full_name || user.email}
-                      </p>
-                    )}
+                    <p className="text-sm text-gray-500 mt-1 hidden md:block">
+                      Kelola uang jajan 25-25 dengan limit mingguan
+                    </p>
                   </div>
                 </div>
 
-                {/* Komponen user menu di kanan */}
+                {/* UserMenu akan otomatis hilang jika user === null */}
                 <UserMenu />
               </div>
             </div>
