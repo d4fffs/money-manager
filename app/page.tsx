@@ -8,7 +8,6 @@ import AddExpenseForm from '@/components/AddExpenseForm'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 
-// 🔒 Proteksi halaman (cek login)
 export default function Home() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
@@ -22,7 +21,6 @@ export default function Home() {
   const [showTambahModal, setShowTambahModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showWeeklyModal, setShowWeeklyModal] = useState(false)
-  const [showWelcomePopup, setShowWelcomePopup] = useState(false)
 
   // Form inputs
   const [newSaldo, setNewSaldo] = useState('')
@@ -35,10 +33,8 @@ export default function Home() {
         router.push('/login')
       } else {
         setUser(data.user)
-        fetchData().then(() => {
-          setGlobalLoading(false)
-          setTimeout(() => setShowWelcomePopup(true), 500)
-        })
+        await fetchData()
+        setGlobalLoading(false)
       }
     }
     checkUser()
@@ -158,7 +154,6 @@ export default function Home() {
     }
   }
 
-  // Proteksi sementara loading user
   if (!user || globalLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-700">
@@ -169,8 +164,6 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6 md:p-8 relative">
-      {/* Tombol logout di kanan atas */}
-
       <div className="max-w-6xl mx-auto opacity-80">
         <AllowanceCard allowance={allowance} remaining={remaining} />
 
@@ -197,7 +190,6 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Komponen lainnya tetap sama */}
         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
             <h2 className="text-xl font-bold text-gray-800 mb-4">Tambah Pengeluaran</h2>
@@ -253,6 +245,101 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* MODAL: Tambah Saldo */}
+      {showTambahModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white rounded-xl p-6 w-96 shadow-lg">
+            <h2 className="text-xl font-semibold mb-4">Tambah Saldo</h2>
+            <input
+              type="number"
+              value={newSaldo}
+              onChange={(e) => setNewSaldo(e.target.value)}
+              placeholder="Masukkan nominal saldo"
+              className="border border-gray-300 rounded-lg w-full p-2 mb-4"
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowTambahModal(false)}
+                className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+              >
+                Batal
+              </button>
+              <button
+                onClick={tambahSaldo}
+                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                disabled={loading}
+              >
+                {loading ? 'Memproses...' : 'Tambah'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Edit Saldo */}
+      {showEditModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white rounded-xl p-6 w-96 shadow-lg">
+            <h2 className="text-xl font-semibold mb-4">Edit Saldo</h2>
+            <input
+              type="number"
+              value={newSaldo}
+              onChange={(e) => setNewSaldo(e.target.value)}
+              placeholder="Masukkan nominal baru"
+              className="border border-gray-300 rounded-lg w-full p-2 mb-4"
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+              >
+                Batal
+              </button>
+              <button
+                onClick={editSaldo}
+                className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
+                disabled={loading}
+              >
+                {loading ? 'Memproses...' : 'Simpan'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Tambah Limit Mingguan */}
+      {showWeeklyModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white rounded-xl p-6 w-96 shadow-lg">
+            <h2 className="text-xl font-semibold mb-4">Tambah Limit Mingguan</h2>
+            <input
+              type="number"
+              value={weeklyLimit}
+              onChange={(e) => setWeeklyLimit(e.target.value)}
+              placeholder="Masukkan limit mingguan"
+              className="border border-gray-300 rounded-lg w-full p-2 mb-4"
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowWeeklyModal(false)}
+                className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => {
+                  toast.success('Fitur limit mingguan belum diimplementasi')
+                  setShowWeeklyModal(false)
+                }}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
