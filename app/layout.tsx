@@ -1,12 +1,18 @@
 import './globals.css'
 import ToasterClient from '@/components/ToasterClient'
+import { supabase } from '@/lib/db'
 
 export const metadata = {
   title: 'Money Manager',
   description: 'Manage allowance 25–25 with weekly limit',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Ambil user aktif dari Supabase (Server Component)
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   return (
     <html lang="id">
       <body className="bg-gradient-to-br from-slate-50 to-gray-100 min-h-screen">
@@ -21,21 +27,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     </svg>
                   </div>
                   <div>
-                    <h1 className="text-xl md:text-2xl font-bold text-gray-800">Money Manager</h1>
+                    <h1 className="text-xl md:text-2xl font-bold text-gray-800">
+                      Money Manager
+                    </h1>
+                    {user && (
+                      <p className="text-sm text-gray-500 mt-1">
+                        Halo, {user.user_metadata.full_name || user.email}
+                      </p>
+                    )}
                   </div>
-                </div>
-                <div className="hidden md:flex items-center gap-2 bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-2 rounded-xl border border-indigo-100">
-                  <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-sm text-indigo-700 font-medium">Kelola uang jajan dengan bijak</span>
                 </div>
               </div>
             </div>
           </header>
-          <main>
-            {children}
-          </main>
+
+          <main>{children}</main>
         </div>
         <ToasterClient />
       </body>
