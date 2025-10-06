@@ -16,6 +16,8 @@ export default function Home() {
   const [expenses, setExpenses] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [globalLoading, setGlobalLoading] = useState(true)
+  const [activePeriod, setActivePeriod] = useState<any>(null)
+  const [weeklySpent, setWeeklySpent] = useState(0)
 
   // Modal states
   const [showTambahModal, setShowTambahModal] = useState(false)
@@ -68,6 +70,36 @@ export default function Home() {
       setExpenses(ex || [])
       const totalSpent = (ex || []).reduce((s, row) => s + Number(row.amount), 0)
       setRemaining(Number(a.remaining_amount ?? Number(a.total_amount) - totalSpent))
+    }
+
+    // Ambil periode mingguan aktif
+    const today = new Date().toISOString().split('T')[0]
+    const { data: wp, error: wpError } = await supabase
+      .from('weekly_periods')
+      .select('*')
+      .lte('start_date', today)
+      .gte('end_date', today)
+      .order('start_date', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (wpError && wpError.code !== 'PGRST116') console.error(wpError)
+    setActivePeriod(wp || null)
+
+    // Hitung pengeluaran dalam periode aktif
+    if (wp) {
+      const { data: wexp, error: wexpErr } = await supabase
+        .from('expenses')
+        .select('*')
+        .gte('date', wp.start_date)
+        .lte('date', wp.end_date)
+
+      if (!wexpErr) {
+        const spent = (wexp || []).reduce((s, row) => s + Number(row.amount), 0)
+        setWeeklySpent(spent)
+      }
+    } else {
+      setWeeklySpent(0)
     }
   }
 
@@ -171,7 +203,6 @@ export default function Home() {
     try {
       const today = new Date()
       const startDate = new Date(today)
-      
       const endDate = new Date(startDate)
       endDate.setDate(startDate.getDate() + 6)
 
@@ -188,6 +219,7 @@ export default function Home() {
       setShowWeeklyModal(false)
       setPeriodName('')
       setWeeklyLimit('')
+      fetchData()
     } catch (err: any) {
       console.error(err)
       toast.error('Gagal menambahkan periode mingguan!')
@@ -204,11 +236,68 @@ export default function Home() {
     )
   }
 
+  const weeklyUsedPercent = activePeriod
+    ? Math.min((weeklySpent / activePeriod.weekly_limit) * 100, 100)
+    : 0
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6 md:p-8 relative">
       <div className="max-w-6xl mx-auto opacity-80">
+        {/* CARD SALDO */}
         <AllowanceCard allowance={allowance} remaining={remaining} />
 
+        {/* CARD PERIODE AKTIF */}
+        {activePeriod ? (
+          <div className="mt-6 bg-gradient-to-r from-blue-100 via-indigo-100 to-purple-100 p-6 rounded-2xl shadow-lg border border-indigo-200">
+            <h2 className="text-xl font-bold text-indigo-800 mb-3">Periode Mingguan Aktif</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="bg-white/70 rounded-xl p-4 shadow-sm">
+                <p className="text-sm text-gray-600">Nama Periode</p>
+                <p className="text-lg font-semibold text-gray-800">{activePeriod.period_name}</p>
+              </div>
+              <div className="bg-white/70 rounded-xl p-4 shadow-sm">
+                <p className="text-sm text-gray-600">Tanggal Mulai</p>
+                <p className="text-lg font-semibold text-gray-800">
+                  {new Date(activePeriod.start_date).toLocaleDateString('id-ID', {
+                    day: 'numeric', month: 'long', year: 'numeric'
+                  })}
+                </p>
+              </div>
+              <div className="bg-white/70 rounded-xl p-4 shadow-sm">
+                <p className="text-sm text-gray-600">Tanggal Selesai</p>
+                <p className="text-lg font-semibold text-gray-800">
+                  {new Date(activePeriod.end_date).toLocaleDateString('id-ID', {
+                    day: 'numeric', month: 'long', year: 'numeric'
+                  })}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 bg-white/70 rounded-xl p-5 shadow-sm">
+              <div className="flex justify-between items-center mb-2">
+                <p className="text-sm text-gray-600">Limit Mingguan</p>
+                <p className="text-sm text-gray-600">
+                  {weeklyUsedPercent.toFixed(1)}% terpakai
+                </p>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3 mb-3">
+                <div
+                  className="bg-indigo-500 h-3 rounded-full transition-all duration-500"
+                  style={{ width: `${weeklyUsedPercent}%` }}
+                />
+              </div>
+              <p className="text-lg font-bold text-indigo-700">
+                Rp {weeklySpent.toLocaleString()} / Rp {activePeriod.weekly_limit.toLocaleString()}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-6 bg-gray-100 text-gray-600 p-6 rounded-2xl text-center border border-gray-200">
+            Belum ada periode mingguan aktif saat ini.
+          </div>
+        )}
+
+        {/* TOMBOL AKSI */}
         <div className="mt-6 flex flex-col md:flex-row items-center gap-4">
           <button
             onClick={() => setShowTambahModal(true)}
@@ -232,6 +321,7 @@ export default function Home() {
           </button>
         </div>
 
+        {/* FORM DAN RINGKASAN */}
         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
             <h2 className="text-xl font-bold text-gray-800 mb-4">Tambah Pengeluaran</h2>
@@ -288,7 +378,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* MODAL: Tambah Saldo */}
+      {/* === MODALS === */}
       {showTambahModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white rounded-xl p-6 w-96 shadow-lg">
@@ -319,7 +409,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL: Edit Saldo */}
       {showEditModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white rounded-xl p-6 w-96 shadow-lg">
@@ -350,7 +439,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL: Tambah Periode Mingguan */}
       {showWeeklyModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
@@ -358,60 +446,46 @@ export default function Home() {
               <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
                 <span className="text-2xl">📅</span>
               </div>
-              <h2 className="text-2xl font-bold text-gray-800">Buat Periode Mingguan</h2>
+                            <h2 className="text-2xl font-bold text-gray-800">Buat Periode Mingguan</h2>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nama Periode
-                </label>
+                <label className="text-sm text-gray-600">Nama Periode</label>
                 <input
                   type="text"
                   value={periodName}
                   onChange={(e) => setPeriodName(e.target.value)}
-                  placeholder="Contoh: Minggu 1 Oktober"
-                  className="border border-gray-300 rounded-lg w-full p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                  placeholder="Misal: Minggu ke-1 Oktober"
+                  className="border border-gray-300 rounded-lg w-full p-2"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Limit Mingguan (Rp)
-                </label>
+                <label className="text-sm text-gray-600">Limit Mingguan</label>
                 <input
                   type="number"
                   value={weeklyLimit}
                   onChange={(e) => setWeeklyLimit(e.target.value)}
                   placeholder="Masukkan nominal limit"
-                  className="border border-gray-300 rounded-lg w-full p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                  className="border border-gray-300 rounded-lg w-full p-2"
                 />
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-800">
-                  <strong>Info:</strong> Periode akan dimulai dari hari ini dan berlaku selama 7 hari ke depan.
-                </p>
               </div>
             </div>
 
             <div className="flex justify-end gap-3 mt-6">
               <button
-                onClick={() => {
-                  setShowWeeklyModal(false)
-                  setPeriodName('')
-                  setWeeklyLimit('')
-                }}
-                className="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition"
+                onClick={() => setShowWeeklyModal(false)}
+                className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
               >
                 Batal
               </button>
               <button
                 onClick={simpanLimitMingguan}
-                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={loading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-70"
               >
-                {loading ? 'Menyimpan...' : '💾 Simpan Periode'}
+                {loading ? 'Menyimpan...' : 'Simpan'}
               </button>
             </div>
           </div>
