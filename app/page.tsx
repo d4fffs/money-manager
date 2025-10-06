@@ -1,235 +1,253 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/db'
-import { useRouter } from 'next/navigation'
-import AllowanceCard from '@/components/AllowanceCard'
-import AddExpenseForm from '@/components/AddExpenseForm'
-import Link from 'next/link'
-import toast from 'react-hot-toast'
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/db";
+import { useRouter } from "next/navigation";
+import AllowanceCard from "@/components/AllowanceCard";
+import AddExpenseForm from "@/components/AddExpenseForm";
+import Link from "next/link";
+import toast from "react-hot-toast";
 
 export default function Home() {
-  const router = useRouter()
-  const [user, setUser] = useState<any>(null)
-  const [allowance, setAllowance] = useState<any>(null)
-  const [remaining, setRemaining] = useState(0)
-  const [expenses, setExpenses] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
-  const [globalLoading, setGlobalLoading] = useState(true)
-  const [activePeriod, setActivePeriod] = useState<any>(null)
-  const [weeklySpent, setWeeklySpent] = useState(0)
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [allowance, setAllowance] = useState<any>(null);
+  const [remaining, setRemaining] = useState(0);
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [globalLoading, setGlobalLoading] = useState(true);
+  const [activePeriod, setActivePeriod] = useState<any>(null);
+  const [weeklySpent, setWeeklySpent] = useState(0);
 
-  const [showTambahModal, setShowTambahModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [showWeeklyModal, setShowWeeklyModal] = useState(false)
+  const [showTambahModal, setShowTambahModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showWeeklyModal, setShowWeeklyModal] = useState(false);
 
-  const [newSaldo, setNewSaldo] = useState('')
-  const [periodName, setPeriodName] = useState('')
-  const [weeklyLimit, setWeeklyLimit] = useState('')
+  const [newSaldo, setNewSaldo] = useState("");
+  const [periodName, setPeriodName] = useState("");
+  const [weeklyLimit, setWeeklyLimit] = useState("");
 
   // Cek user login
   useEffect(() => {
     async function checkUser() {
-      const { data } = await supabase.auth.getUser()
+      const { data } = await supabase.auth.getUser();
       if (!data.user) {
-        router.push('/login')
+        router.push("/login");
       } else {
-        setUser(data.user)
-        await fetchData()
-        setGlobalLoading(false)
+        setUser(data.user);
+        await fetchData();
+        setGlobalLoading(false);
       }
     }
-    checkUser()
-  }, [router])
+    checkUser();
+  }, [router]);
 
   // Ambil data allowance, expenses, dan periode aktif
   async function fetchData() {
     const { data: a, error: allowanceError } = await supabase
-      .from('allowances')
-      .select('*')
-      .order('created_at', { ascending: false })
+      .from("allowances")
+      .select("*")
+      .order("created_at", { ascending: false })
       .limit(1)
-      .single()
+      .single();
 
     if (allowanceError) {
-      console.error(allowanceError)
-      return
+      console.error(allowanceError);
+      return;
     }
 
-    setAllowance(a)
+    setAllowance(a);
 
     if (a) {
       const { data: ex, error: expenseError } = await supabase
-        .from('expenses')
-        .select('*')
-        .eq('allowance_id', a.id)
-        .order('date', { ascending: false })
+        .from("expenses")
+        .select("*")
+        .eq("allowance_id", a.id)
+        .order("date", { ascending: false });
 
-      if (expenseError) console.error(expenseError)
+      if (expenseError) console.error(expenseError);
 
-      setExpenses(ex || [])
-      const totalSpent = (ex || []).reduce((s, row) => s + Number(row.amount), 0)
-      setRemaining(Number(a.remaining_amount ?? Number(a.total_amount) - totalSpent))
+      setExpenses(ex || []);
+      const totalSpent = (ex || []).reduce(
+        (s, row) => s + Number(row.amount),
+        0
+      );
+      setRemaining(
+        Number(a.remaining_amount ?? Number(a.total_amount) - totalSpent)
+      );
     }
 
     // Cek periode mingguan aktif
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toISOString().split("T")[0];
     const { data: wp, error: wpError } = await supabase
-      .from('weekly_periods')
-      .select('*')
-      .lte('start_date', today)
-      .gte('end_date', today)
-      .order('start_date', { ascending: false })
+      .from("weekly_periods")
+      .select("*")
+      .lte("start_date", today)
+      .gte("end_date", today)
+      .order("start_date", { ascending: false })
       .limit(1)
-      .single()
+      .single();
 
-    if (wpError && wpError.code !== 'PGRST116') console.error(wpError)
-    setActivePeriod(wp || null)
+    if (wpError && wpError.code !== "PGRST116") console.error(wpError);
+    setActivePeriod(wp || null);
 
     // Hitung pengeluaran minggu ini
     if (wp) {
       const { data: wexp, error: wexpErr } = await supabase
-        .from('expenses')
-        .select('*')
-        .gte('date', wp.start_date)
-        .lte('date', wp.end_date)
+        .from("expenses")
+        .select("*")
+        .gte("date", wp.start_date)
+        .lte("date", wp.end_date);
 
       if (!wexpErr) {
-        const spent = (wexp || []).reduce((s, row) => s + Number(row.amount), 0)
-        setWeeklySpent(spent)
+        const spent = (wexp || []).reduce(
+          (s, row) => s + Number(row.amount),
+          0
+        );
+        setWeeklySpent(spent);
       }
     } else {
-      setWeeklySpent(0)
+      setWeeklySpent(0);
     }
   }
 
   // Tambah saldo
   async function tambahSaldo() {
     if (!newSaldo || isNaN(Number(newSaldo))) {
-      toast.error('Masukkan nominal saldo yang valid')
-      return
+      toast.error("Masukkan nominal saldo yang valid");
+      return;
     }
 
-    setLoading(true)
+    setLoading(true);
     try {
       if (allowance) {
         const { error } = await supabase
-          .from('allowances')
+          .from("allowances")
           .update({
             total_amount: allowance.total_amount + Number(newSaldo),
             remaining_amount: allowance.remaining_amount + Number(newSaldo),
           })
-          .eq('id', allowance.id)
+          .eq("id", allowance.id);
 
-        if (error) throw error
-        toast.success('Saldo berhasil ditambahkan!')
+        if (error) throw error;
+        toast.success("Saldo berhasil ditambahkan!");
       } else {
-        const now = new Date()
-        const start = new Date(now.getFullYear(), now.getMonth(), 25)
-        const end = new Date(start)
-        end.setMonth(start.getMonth() + 1)
-        end.setDate(24)
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), 25);
+        const end = new Date(start);
+        end.setMonth(start.getMonth() + 1);
+        end.setDate(24);
 
-        const { error } = await supabase.from('allowances').insert([{
-          period_start: start.toISOString().split('T')[0],
-          period_end: end.toISOString().split('T')[0],
-          total_amount: Number(newSaldo),
-          remaining_amount: Number(newSaldo),
-        }])
-        if (error) throw error
-        toast.success('Saldo baru berhasil dibuat!')
+        const { error } = await supabase.from("allowances").insert([
+          {
+            period_start: start.toISOString().split("T")[0],
+            period_end: end.toISOString().split("T")[0],
+            total_amount: Number(newSaldo),
+            remaining_amount: Number(newSaldo),
+          },
+        ]);
+        if (error) throw error;
+        toast.success("Saldo baru berhasil dibuat!");
       }
 
-      setShowTambahModal(false)
-      setNewSaldo('')
-      fetchData()
+      setShowTambahModal(false);
+      setNewSaldo("");
+      fetchData();
     } catch (err: any) {
-      console.error(err)
-      toast.error('Gagal menambahkan saldo!')
+      console.error(err);
+      toast.error("Gagal menambahkan saldo!");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   // Edit saldo
   async function editSaldo() {
     if (!newSaldo || isNaN(Number(newSaldo))) {
-      toast.error('Masukkan nominal saldo yang valid')
-      return
+      toast.error("Masukkan nominal saldo yang valid");
+      return;
     }
 
     if (!allowance) {
-      toast.error('Belum ada saldo untuk diedit!')
-      return
+      toast.error("Belum ada saldo untuk diedit!");
+      return;
     }
 
-    setLoading(true)
+    setLoading(true);
     try {
       const { error } = await supabase
-        .from('allowances')
+        .from("allowances")
         .update({
           total_amount: Number(newSaldo),
           remaining_amount: Number(newSaldo),
         })
-        .eq('id', allowance.id)
+        .eq("id", allowance.id);
 
-      if (error) throw error
-      toast.success('Saldo berhasil diedit!')
+      if (error) throw error;
+      toast.success("Saldo berhasil diedit!");
 
-      setShowEditModal(false)
-      setNewSaldo('')
-      fetchData()
+      setShowEditModal(false);
+      setNewSaldo("");
+      fetchData();
     } catch (err: any) {
-      console.error(err)
-      toast.error('Gagal mengedit saldo!')
+      console.error(err);
+      toast.error("Gagal mengedit saldo!");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   // Tambah periode mingguan (dengan validasi periode aktif)
   async function simpanLimitMingguan() {
     if (activePeriod) {
-      toast.error('Masih ada periode mingguan aktif! Selesaikan dulu sebelum membuat baru.')
-      return
+      toast.error(
+        "Masih ada periode mingguan aktif! Selesaikan dulu sebelum membuat baru."
+      );
+      return;
     }
 
     if (!periodName.trim()) {
-      toast.error('Masukkan nama periode')
-      return
+      toast.error("Masukkan nama periode");
+      return;
     }
 
-    if (!weeklyLimit || isNaN(Number(weeklyLimit)) || Number(weeklyLimit) <= 0) {
-      toast.error('Masukkan limit mingguan yang valid')
-      return
+    if (
+      !weeklyLimit ||
+      isNaN(Number(weeklyLimit)) ||
+      Number(weeklyLimit) <= 0
+    ) {
+      toast.error("Masukkan limit mingguan yang valid");
+      return;
     }
 
-    setLoading(true)
+    setLoading(true);
     try {
-      const today = new Date()
-      const startDate = new Date(today)
-      const endDate = new Date(startDate)
-      endDate.setDate(startDate.getDate() + 6)
+      const today = new Date();
+      const startDate = new Date(today);
+      const endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
 
-      const { error } = await supabase.from('weekly_periods').insert([{
-        period_name: periodName.trim(),
-        start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0],
-        weekly_limit: Number(weeklyLimit),
-        allowance_id: allowance?.id || null
-      }])
+      const { error } = await supabase.from("weekly_periods").insert([
+        {
+          period_name: periodName.trim(),
+          start_date: startDate.toISOString().split("T")[0],
+          end_date: endDate.toISOString().split("T")[0],
+          weekly_limit: Number(weeklyLimit),
+          allowance_id: allowance?.id || null,
+        },
+      ]);
 
-      if (error) throw error
-      toast.success('Periode mingguan berhasil ditambahkan!')
-      setShowWeeklyModal(false)
-      setPeriodName('')
-      setWeeklyLimit('')
-      fetchData()
+      if (error) throw error;
+      toast.success("Periode mingguan berhasil ditambahkan!");
+      setShowWeeklyModal(false);
+      setPeriodName("");
+      setWeeklyLimit("");
+      fetchData();
     } catch (err: any) {
-      console.error(err)
-      toast.error('Gagal menambahkan periode mingguan!')
+      console.error(err);
+      toast.error("Gagal menambahkan periode mingguan!");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -238,12 +256,12 @@ export default function Home() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-700">
         Loading...
       </div>
-    )
+    );
   }
 
   const weeklyUsedPercent = activePeriod
     ? Math.min((weeklySpent / activePeriod.weekly_limit) * 100, 100)
-    : 0
+    : 0;
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6 md:p-8 relative">
@@ -254,25 +272,36 @@ export default function Home() {
         {/* CARD PERIODE AKTIF */}
         {activePeriod ? (
           <div className="mt-6 bg-gradient-to-r from-blue-100 via-indigo-100 to-purple-100 p-6 rounded-2xl shadow-lg border border-indigo-200">
-            <h2 className="text-xl font-bold text-indigo-800 mb-3">Periode Mingguan Aktif</h2>
+            <h2 className="text-xl font-bold text-indigo-800 mb-3">
+              Periode Mingguan Aktif
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="bg-white/70 rounded-xl p-4 shadow-sm">
                 <p className="text-sm text-gray-600">Nama Periode</p>
-                <p className="text-lg font-semibold text-gray-800">{activePeriod.period_name}</p>
+                <p className="text-lg font-semibold text-gray-800">
+                  {activePeriod.period_name}
+                </p>
               </div>
               <div className="bg-white/70 rounded-xl p-4 shadow-sm">
                 <p className="text-sm text-gray-600">Tanggal Mulai</p>
                 <p className="text-lg font-semibold text-gray-800">
-                  {new Date(activePeriod.start_date).toLocaleDateString('id-ID', {
-                    day: 'numeric', month: 'long', year: 'numeric'
-                  })}
+                  {new Date(activePeriod.start_date).toLocaleDateString(
+                    "id-ID",
+                    {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    }
+                  )}
                 </p>
               </div>
               <div className="bg-white/70 rounded-xl p-4 shadow-sm">
                 <p className="text-sm text-gray-600">Tanggal Selesai</p>
                 <p className="text-lg font-semibold text-gray-800">
-                  {new Date(activePeriod.end_date).toLocaleDateString('id-ID', {
-                    day: 'numeric', month: 'long', year: 'numeric'
+                  {new Date(activePeriod.end_date).toLocaleDateString("id-ID", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
                   })}
                 </p>
               </div>
@@ -292,7 +321,8 @@ export default function Home() {
                 />
               </div>
               <p className="text-lg font-bold text-indigo-700">
-                Rp {weeklySpent.toLocaleString()} / Rp {activePeriod.weekly_limit.toLocaleString()}
+                Rp {weeklySpent.toLocaleString()} / Rp{" "}
+                {activePeriod.weekly_limit.toLocaleString()}
               </p>
             </div>
           </div>
@@ -321,17 +351,14 @@ export default function Home() {
           <button
             onClick={() => {
               if (activePeriod) {
-                toast.error('Masih ada periode aktif! Tunggu sampai selesai sebelum menambah yang baru.')
-              } else {
-                setShowWeeklyModal(true)
+                toast.error(
+                  "Tidak bisa membuat periode baru selama ada periode aktif!"
+                );
+                return;
               }
+              setShowWeeklyModal(true);
             }}
-            disabled={!!activePeriod}
-            className={`px-6 py-3 rounded-xl font-semibold shadow-md transition-all ${
-              activePeriod
-                ? 'bg-gray-400 text-white cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700 text-white'
-            }`}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold shadow-md transition-all"
           >
             📅 Tambah Periode Mingguan
           </button>
@@ -340,7 +367,9 @@ export default function Home() {
         {/* FORM DAN RINGKASAN */}
         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Tambah Pengeluaran</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4">
+              Tambah Pengeluaran
+            </h2>
             <AddExpenseForm onAdded={fetchData} validateExpense={() => true} />
           </div>
 
@@ -350,7 +379,10 @@ export default function Home() {
               <div className="bg-gradient-to-r from-red-50 to-pink-50 rounded-xl p-5 border border-red-100">
                 <p className="text-sm text-gray-600 mb-1">Total Pengeluaran</p>
                 <p className="text-2xl font-bold text-gray-800">
-                  Rp {expenses.reduce((s, e) => s + Number(e.amount), 0).toLocaleString()}
+                  Rp{" "}
+                  {expenses
+                    .reduce((s, e) => s + Number(e.amount), 0)
+                    .toLocaleString()}
                 </p>
               </div>
 
@@ -362,7 +394,10 @@ export default function Home() {
               </div>
 
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-100">
-                <Link href="/history" className="flex items-center justify-between group">
+                <Link
+                  href="/history"
+                  className="flex items-center justify-between group"
+                >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition">
                       <svg
@@ -418,7 +453,7 @@ export default function Home() {
                 className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
                 disabled={loading}
               >
-                {loading ? 'Memproses...' : 'Tambah'}
+                {loading ? "Memproses..." : "Tambah"}
               </button>
             </div>
           </div>
@@ -449,7 +484,7 @@ export default function Home() {
                 className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
                 disabled={loading}
               >
-                {loading ? 'Memproses...' : 'Simpan'}
+                {loading ? "Memproses..." : "Simpan"}
               </button>
             </div>
           </div>
@@ -459,8 +494,10 @@ export default function Home() {
       {/* Tambah Periode Mingguan */}
       {showWeeklyModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
-                   <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-lg">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">Buat Periode Mingguan Baru</h2>
+          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-lg">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">
+              Buat Periode Mingguan Baru
+            </h2>
 
             <div className="space-y-4">
               <div>
@@ -475,7 +512,9 @@ export default function Home() {
               </div>
 
               <div>
-                <label className="text-sm text-gray-600">Limit Mingguan (Rp)</label>
+                <label className="text-sm text-gray-600">
+                  Limit Mingguan (Rp)
+                </label>
                 <input
                   type="number"
                   value={weeklyLimit}
@@ -498,12 +537,12 @@ export default function Home() {
                 disabled={loading}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-70"
               >
-                {loading ? 'Menyimpan...' : 'Simpan'}
+                {loading ? "Menyimpan..." : "Simpan"}
               </button>
             </div>
           </div>
         </div>
       )}
     </main>
-  )
+  );
 }
