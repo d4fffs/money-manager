@@ -25,25 +25,34 @@ export default function LoginPage() {
       const isSignup = searchParams.get('mode') === 'signup'
       const exists = await checkProfileExists(currentUser)
 
-      // Jika sedang daftar dan profil belum ada, buat profil baru
-      if (isSignup && !exists) {
+      if (isSignup) {
+        // 🔹 Jika user sedang daftar tapi profil sudah ada
+        if (exists) {
+          toast.error('Akun sudah terdaftar! Silakan login.')
+          await supabase.auth.signOut()
+          setUser(null)
+          router.replace('/login')
+          return
+        }
+
+        // 🔹 Jika belum ada, buat profil baru
         await createProfile(currentUser)
-        toast.success('Akun berhasil dibuat 🎉')
+        toast.success('Akun berhasil dibuat 🎉 Silakan login.')
         await supabase.auth.signOut()
         setUser(null)
         router.replace('/login')
         return
       }
 
-      // Jika mencoba login tapi belum terdaftar
+      // 🔹 Jika sedang login tapi profil belum ada
       if (!isSignup && !exists) {
-        toast.error('Akun belum terdaftar! Silakan daftar terlebih dahulu.')
+        toast.error('Akun belum didaftarkan! Silakan daftar terlebih dahulu.')
         await supabase.auth.signOut()
         setUser(null)
         return
       }
 
-      // Jika login berhasil dan profil ada
+      // 🔹 Jika login berhasil
       if (!isSignup && exists) {
         toast.success('Berhasil login 🎉')
         router.push('/')
@@ -70,7 +79,7 @@ export default function LoginPage() {
     return !!existingProfile
   }
 
-  // 🔹 Buat profil baru untuk user yang baru daftar
+  // 🔹 Buat profil baru untuk user baru
   async function createProfile(user: any) {
     const { error } = await supabase.from('profiles').insert({
       id: user.id,
@@ -113,6 +122,7 @@ export default function LoginPage() {
     else {
       setUser(null)
       toast.success('Berhasil logout 👋')
+      router.replace('/login')
     }
   }
 
