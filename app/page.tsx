@@ -27,7 +27,7 @@ export default function Home() {
   const [periodName, setPeriodName] = useState("");
   const [weeklyLimit, setWeeklyLimit] = useState("");
 
-  // Cek user login
+  // === CEK LOGIN USER ===
   useEffect(() => {
     async function checkUser() {
       const { data } = await supabase.auth.getUser();
@@ -42,8 +42,9 @@ export default function Home() {
     checkUser();
   }, [router]);
 
-  // Ambil data allowance, expenses, dan periode aktif
+  // === AMBIL DATA ALLOWANCE & PERIOD ===
   async function fetchData() {
+    // Ambil allowance terakhir
     const { data: a, error: allowanceError } = await supabase
       .from("allowances")
       .select("*")
@@ -51,13 +52,43 @@ export default function Home() {
       .limit(1)
       .single();
 
-    if (allowanceError) {
+    if (allowanceError && allowanceError.code !== "PGRST116") {
       console.error(allowanceError);
       return;
     }
 
+    // === CEK DAN RESET OTOMATIS JIKA SUDAH LEWAT TANGGAL 25 ===
+    const today = new Date();
+    if (a) {
+      const periodEnd = new Date(a.period_end);
+      if (today > periodEnd) {
+        const newStart = new Date(periodEnd);
+        newStart.setDate(25);
+        const newEnd = new Date(newStart);
+        newEnd.setMonth(newStart.getMonth() + 1);
+        newEnd.setDate(24);
+
+        const { error: insertError } = await supabase.from("allowances").insert([
+          {
+            period_start: newStart.toISOString().split("T")[0],
+            period_end: newEnd.toISOString().split("T")[0],
+            total_amount: a.total_amount, // pakai saldo sama
+            remaining_amount: a.total_amount, // reset progress bar
+          },
+        ]);
+
+        if (!insertError) {
+          toast.success("Periode allowance baru dimulai otomatis!");
+          return fetchData();
+        } else {
+          console.error(insertError);
+        }
+      }
+    }
+
     setAllowance(a);
 
+    // Hitung sisa saldo berdasarkan pengeluaran
     if (a) {
       const { data: ex, error: expenseError } = await supabase
         .from("expenses")
@@ -72,18 +103,17 @@ export default function Home() {
         (s, row) => s + Number(row.amount),
         0
       );
-      setRemaining(
-        Number(a.remaining_amount ?? Number(a.total_amount) - totalSpent)
-      );
+
+      setRemaining(Number(a.total_amount) - totalSpent);
     }
 
-    // Cek periode mingguan aktif
-    const today = new Date().toISOString().split("T")[0];
+    // === CEK PERIODE MINGGUAN AKTIF ===
+    const todayStr = new Date().toISOString().split("T")[0];
     const { data: wp, error: wpError } = await supabase
       .from("weekly_periods")
       .select("*")
-      .lte("start_date", today)
-      .gte("end_date", today)
+      .lte("start_date", todayStr)
+      .gte("end_date", todayStr)
       .order("start_date", { ascending: false })
       .limit(1)
       .single();
@@ -100,10 +130,7 @@ export default function Home() {
         .lte("date", wp.end_date);
 
       if (!wexpErr) {
-        const spent = (wexp || []).reduce(
-          (s, row) => s + Number(row.amount),
-          0
-        );
+        const spent = (wexp || []).reduce((s, row) => s + Number(row.amount), 0);
         setWeeklySpent(spent);
       }
     } else {
@@ -111,7 +138,7 @@ export default function Home() {
     }
   }
 
-  // Tambah saldo
+  // === TAMBAH SALDO TANPA RESET PROGRESS ===
   async function tambahSaldo() {
     if (!newSaldo || isNaN(Number(newSaldo))) {
       toast.error("Masukkan nominal saldo yang valid");
@@ -125,13 +152,13 @@ export default function Home() {
           .from("allowances")
           .update({
             total_amount: allowance.total_amount + Number(newSaldo),
-            remaining_amount: allowance.remaining_amount + Number(newSaldo),
           })
           .eq("id", allowance.id);
 
         if (error) throw error;
         toast.success("Saldo berhasil ditambahkan!");
       } else {
+        // Buat allowance baru pertama kali
         const now = new Date();
         const start = new Date(now.getFullYear(), now.getMonth(), 25);
         const end = new Date(start);
@@ -146,6 +173,7 @@ export default function Home() {
             remaining_amount: Number(newSaldo),
           },
         ]);
+
         if (error) throw error;
         toast.success("Saldo baru berhasil dibuat!");
       }
@@ -161,7 +189,7 @@ export default function Home() {
     }
   }
 
-  // Edit saldo
+  // === EDIT SALDO TANPA RESET PROGRESS ===
   async function editSaldo() {
     if (!newSaldo || isNaN(Number(newSaldo))) {
       toast.error("Masukkan nominal saldo yang valid");
@@ -179,7 +207,6 @@ export default function Home() {
         .from("allowances")
         .update({
           total_amount: Number(newSaldo),
-          remaining_amount: Number(newSaldo),
         })
         .eq("id", allowance.id);
 
@@ -197,12 +224,10 @@ export default function Home() {
     }
   }
 
-  // Tambah periode mingguan (dengan validasi periode aktif)
+  // === SIMPAN PERIODE MINGGUAN ===
   async function simpanLimitMingguan() {
     if (activePeriod) {
-      toast.error(
-        "Masih ada periode mingguan aktif! Selesaikan dulu sebelum membuat baru."
-      );
+      toast.error("Masih ada periode mingguan aktif!");
       return;
     }
 
@@ -211,11 +236,7 @@ export default function Home() {
       return;
     }
 
-    if (
-      !weeklyLimit ||
-      isNaN(Number(weeklyLimit)) ||
-      Number(weeklyLimit) <= 0
-    ) {
+    if (!weeklyLimit || isNaN(Number(weeklyLimit)) || Number(weeklyLimit) <= 0) {
       toast.error("Masukkan limit mingguan yang valid");
       return;
     }
@@ -251,6 +272,7 @@ export default function Home() {
     }
   }
 
+  // === UI ===
   if (!user || globalLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-700">
@@ -275,6 +297,7 @@ export default function Home() {
             <h2 className="text-xl font-bold text-indigo-800 mb-3">
               Periode Mingguan Aktif
             </h2>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="bg-white/70 rounded-xl p-4 shadow-sm">
                 <p className="text-sm text-gray-600">Nama Periode</p>
@@ -285,24 +308,13 @@ export default function Home() {
               <div className="bg-white/70 rounded-xl p-4 shadow-sm">
                 <p className="text-sm text-gray-600">Tanggal Mulai</p>
                 <p className="text-lg font-semibold text-gray-800">
-                  {new Date(activePeriod.start_date).toLocaleDateString(
-                    "id-ID",
-                    {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    }
-                  )}
+                  {new Date(activePeriod.start_date).toLocaleDateString("id-ID")}
                 </p>
               </div>
               <div className="bg-white/70 rounded-xl p-4 shadow-sm">
                 <p className="text-sm text-gray-600">Tanggal Selesai</p>
                 <p className="text-lg font-semibold text-gray-800">
-                  {new Date(activePeriod.end_date).toLocaleDateString("id-ID", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
+                  {new Date(activePeriod.end_date).toLocaleDateString("id-ID")}
                 </p>
               </div>
             </div>
@@ -332,7 +344,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* TOMBOL AKSI */}
+        {/* Tombol aksi */}
         <div className="mt-6 flex flex-col md:flex-row items-center gap-4">
           <button
             onClick={() => setShowTambahModal(true)}
@@ -351,9 +363,7 @@ export default function Home() {
           <button
             onClick={() => {
               if (activePeriod) {
-                toast.error(
-                  "Tidak bisa membuat periode baru selama ada periode aktif!"
-                );
+                toast.error("Tidak bisa membuat periode baru selama ada yang aktif!");
                 return;
               }
               setShowWeeklyModal(true);
@@ -364,7 +374,7 @@ export default function Home() {
           </button>
         </div>
 
-        {/* FORM DAN RINGKASAN */}
+        {/* FORM & RINGKASAN */}
         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
             <h2 className="text-xl font-bold text-gray-800 mb-4">
@@ -394,10 +404,7 @@ export default function Home() {
               </div>
 
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-100">
-                <Link
-                  href="/history"
-                  className="flex items-center justify-between group"
-                >
+                <Link href="/history" className="flex items-center justify-between group">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition">
                       <svg
@@ -429,69 +436,30 @@ export default function Home() {
       </div>
 
       {/* === MODALS === */}
-      {/* Tambah Saldo */}
       {showTambahModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white rounded-xl p-6 w-96 shadow-lg">
-            <h2 className="text-xl font-semibold mb-4">Tambah Saldo</h2>
-            <input
-              type="number"
-              value={newSaldo}
-              onChange={(e) => setNewSaldo(e.target.value)}
-              placeholder="Masukkan nominal saldo"
-              className="border border-gray-300 rounded-lg w-full p-2 mb-4"
-            />
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowTambahModal(false)}
-                className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
-              >
-                Batal
-              </button>
-              <button
-                onClick={tambahSaldo}
-                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
-                disabled={loading}
-              >
-                {loading ? "Memproses..." : "Tambah"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <Modal
+          title="Tambah Saldo"
+          loading={loading}
+          value={newSaldo}
+          setValue={setNewSaldo}
+          onClose={() => setShowTambahModal(false)}
+          onSave={tambahSaldo}
+          saveLabel="Tambah"
+        />
       )}
 
-      {/* Edit Saldo */}
       {showEditModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white rounded-xl p-6 w-96 shadow-lg">
-            <h2 className="text-xl font-semibold mb-4">Edit Saldo</h2>
-            <input
-              type="number"
-              value={newSaldo}
-              onChange={(e) => setNewSaldo(e.target.value)}
-              placeholder="Masukkan nominal baru"
-              className="border border-gray-300 rounded-lg w-full p-2 mb-4"
-            />
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
-              >
-                Batal
-              </button>
-              <button
-                onClick={editSaldo}
-                className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
-                disabled={loading}
-              >
-                {loading ? "Memproses..." : "Simpan"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <Modal
+          title="Edit Saldo"
+          loading={loading}
+          value={newSaldo}
+          setValue={setNewSaldo}
+          onClose={() => setShowEditModal(false)}
+          onSave={editSaldo}
+          saveLabel="Simpan"
+        />
       )}
 
-      {/* Tambah Periode Mingguan */}
       {showWeeklyModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-lg">
@@ -512,9 +480,7 @@ export default function Home() {
               </div>
 
               <div>
-                <label className="text-sm text-gray-600">
-                  Limit Mingguan (Rp)
-                </label>
+                <label className="text-sm text-gray-600">Limit Mingguan (Rp)</label>
                 <input
                   type="number"
                   value={weeklyLimit}
@@ -528,14 +494,14 @@ export default function Home() {
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setShowWeeklyModal(false)}
-                className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+                className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg"
               >
                 Batal
               </button>
               <button
                 onClick={simpanLimitMingguan}
                 disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-70"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
               >
                 {loading ? "Menyimpan..." : "Simpan"}
               </button>
@@ -544,5 +510,40 @@ export default function Home() {
         </div>
       )}
     </main>
+  );
+}
+
+// === KOMPONEN MODAL REUSABLE ===
+function Modal({ title, value, setValue, onClose, onSave, loading, saveLabel }: any) {
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
+      <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-lg">
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">{title}</h2>
+
+        <input
+          type="number"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="Masukkan nominal saldo"
+          className="border border-gray-300 rounded-lg w-full p-2"
+        />
+
+        <div className="flex justify-end gap-3 mt-6">
+          <button
+            onClick={onClose}
+            className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg"
+          >
+            Batal
+          </button>
+          <button
+            onClick={onSave}
+            disabled={loading}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
+          >
+            {loading ? "Menyimpan..." : saveLabel}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
